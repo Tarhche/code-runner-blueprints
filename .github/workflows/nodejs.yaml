@@ -1,0 +1,77 @@
+name: NodeJS Blueprints CI and CD
+
+on:
+  push:
+    paths:
+      - 'nodejs/**'
+
+  pull_request:
+    paths:
+      - 'nodejs/**'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: code-runner
+  BUILD_ARG_VERSION_NAME: NODEJS_VERSION
+
+concurrency:
+  group: nodejs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        nodejs_version: [20.19, 22.14, 23.11]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build nodejs:${{ matrix.nodejs_version }} image
+        uses: ./.github/actions/docker-build
+        with:
+          context: ./nodejs
+          dockerfile: ./nodejs/Dockerfile
+          image-name: ${{ env.IMAGE_NAME }}
+          tag: nodejs-${{ matrix.nodejs_version }}
+          push: false
+          container-registry: ${{ env.REGISTRY }}
+          build-arg-version-name: ${{ env.BUILD_ARG_VERSION_NAME }}
+          build-arg-version-value: ${{ matrix.nodejs_version }}
+
+  cd:
+    runs-on: ubuntu-latest
+
+    if: ${{ format('refs/heads/{0}', github.event.repository.default_branch) == github.ref }}
+
+    strategy:
+      matrix:
+        nodejs_version: [20.19, 22.14, 23.11]
+
+    permissions:
+      packages: write
+      contents: read
+
+    needs:
+      - ci
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build and push nodejs:${{ matrix.nodejs_version }} image
+        uses: ./.github/actions/docker-build
+        with:
+          context: ./nodejs
+          dockerfile: ./nodejs/Dockerfile
+          image-name: ${{ env.IMAGE_NAME }}
+          tag: nodejs-${{ matrix.nodejs_version }}
+          push: true
+          container-registry: ${{ env.REGISTRY }}
+          container-registry-username: ${{ github.actor }}
+          container-registry-password: ${{ secrets.GITHUB_TOKEN }}
+          build-arg-version-name: ${{ env.BUILD_ARG_VERSION_NAME }}
+          build-arg-version-value: ${{ matrix.nodejs_version }}

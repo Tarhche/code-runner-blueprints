@@ -1,0 +1,77 @@
+name: PHP Blueprints CI and CD
+
+on:
+  push:
+    paths:
+      - 'php/**'
+
+  pull_request:
+    paths:
+      - 'php/**'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: code-runner
+  BUILD_ARG_VERSION_NAME: PHP_VERSION
+
+concurrency:
+  group: php-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        php_version: [8.3, 8.4]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build php:${{ matrix.php_version }} image
+        uses: ./.github/actions/docker-build
+        with:
+          context: ./php
+          dockerfile: ./php/Dockerfile
+          image-name: ${{ env.IMAGE_NAME }}
+          tag: php-${{ matrix.php_version }}
+          push: false
+          container-registry: ${{ env.REGISTRY }}
+          build-arg-version-name: ${{ env.BUILD_ARG_VERSION_NAME }}
+          build-arg-version-value: ${{ matrix.php_version }}
+
+  cd:
+    runs-on: ubuntu-latest
+
+    if: ${{ format('refs/heads/{0}', github.event.repository.default_branch) == github.ref }}
+
+    strategy:
+      matrix:
+        php_version: [8.3, 8.4]
+
+    permissions:
+      packages: write
+      contents: read
+
+    needs:
+      - ci
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build and push php:${{ matrix.php_version }} image
+        uses: ./.github/actions/docker-build
+        with:
+          context: ./php
+          dockerfile: ./php/Dockerfile
+          image-name: ${{ env.IMAGE_NAME }}
+          tag: php-${{ matrix.php_version }}
+          push: true
+          container-registry: ${{ env.REGISTRY }}
+          container-registry-username: ${{ github.actor }}
+          container-registry-password: ${{ secrets.GITHUB_TOKEN }}
+          build-arg-version-name: ${{ env.BUILD_ARG_VERSION_NAME }}
+          build-arg-version-value: ${{ matrix.php_version }}
