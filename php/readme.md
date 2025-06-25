@@ -7,7 +7,7 @@ This Dockerfile will creates a docker image which can be used to run a JS code w
 docker build --build-arg PHP_VERSION=8.4 -t code-runner:php-8.4 .
 ```
 
-The Nodejs version can be specified by passing the `PHP_VERSION` argument to the `docker build` command.
+The PHP version can be specified by passing the `PHP_VERSION` argument to the `docker build` command.
 
 # How to use
 
